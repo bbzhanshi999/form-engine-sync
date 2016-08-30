@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form-engine>
+    <image-upload>
+        <save-path>D:/test/upload</save-path>
+        <file-type>gif,jpg,jpeg,png,bmp</file-type>
+        <max-size>1000000</max-size>
+    </image-upload>
+
+    <combo-configs>
+        <combo-config code="dict" name="字典">
+            <sql-template>
+                <![CDATA[
+				SELECT A.PROJECT_DETAIL_CODE,A.SHORT_NAME FROM C_PROJECT_DETAILS A 
+				LEFT JOIN C_PROJECT B ON A.PROJECT_ID = B.PROJECT_ID WHERE PROJECT_CODE = '${param.filter}' 
+				<#if param.fuzzy?? && param.fuzzy != ''> 
+					AND (A.PROJECT_DETAIL_CODE LIKE '%${param.fuzzy}%' OR A.SHORT_NAME LIKE '%${param.fuzzy}%')
+				</#if>
+				ORDER BY A.ITEM_SEQUENCE
+				]]>
+            </sql-template>
+            <display-template>${result.SHORT_NAME}</display-template>
+            <value-template>${result.PROJECT_DETAIL_CODE}</value-template>
+        </combo-config>
+
+        <combo-config code="staff" name="人员">
+            <sql-template>
+                <![CDATA[
+				SELECT DISTINCT YGBH,XM FROM VIEW_YGJBXX WHERE 1 = 1 
+				<#if param.filter?? && param.filter != ''> 
+					AND ZC_TYPE = '${param.filter}' 
+				</#if>
+				<#if param.fuzzy?? && param.fuzzy != ''> 
+					AND XM LIKE '%${param.fuzzy}%' 
+				</#if>
+				]]>
+            </sql-template>
+            <display-template>${result.XM}</display-template>
+            <value-template>${result.YGBH}</value-template>
+        </combo-config>
+
+        <combo-config code="icd" name="ICD">
+            <sql-template>
+                <![CDATA[
+				select ICD_CODE,ICD_NAME from ICD
+                Where  ICD_TYPE = '${param.filter}'
+                <#if param.fuzzy?? && param.fuzzy != ''>
+                   AND (ICD_NAME like '%${param.fuzzy}%' Or SPELL_CODE Like '%${param.fuzzy}%')
+                order by
+                  (Case When Instr(ICD_NAME||SPELL_CODE,'疟疾')>0 Then 1 Else 0 End) asc,nvl(length(trim(ICD_NAME)),0) asc
+                </#if>
+				]]>
+            </sql-template>
+            <display-template>${result.ICD_NAME}</display-template>
+            <value-template>${result.ICD_CODE}</value-template>
+        </combo-config>
+
+        <combo-config code="icd2" name="ICD2">
+            <sql-template>
+                <![CDATA[
+				    select ICD_CODE,ICD_NAME FROM ICD WHERE ICD_TYPE = '${param.filter}'
+				    <#if param.fuzzy?? && param.fuzzy != ''>
+				    AND (INSTR(ICD_CODE,'${param.fuzzy}')=1)
+                    </#if>
+				    ORDER  BY ICD_CODE
+				]]>
+            </sql-template>
+            <display-template>${result.ICD_NAME}</display-template>
+            <value-template>${result.ICD_CODE}</value-template>
+        </combo-config>
+
+        <combo-config code="surgery" name="手术">
+        	<sql-template>
+                <![CDATA[
+				SELECT ITEMID,ITEMNAME FROM OPT_ITEM_INFO WHERE 1=1
+				<#if param.fuzzy?? && param.fuzzy != ''>
+					AND (ITEMNAME LIKE '%${param.fuzzy}%' OR INPUTSTR LIKE '%${param.fuzzy}%' OR ITEMID LIKE '%${param.fuzzy}%')
+				</#if>
+				]]>
+            </sql-template>
+            <display-template>${result.ITEMNAME}</display-template>
+            <value-template>${result.ITEMID}</value-template>
+        </combo-config>
+    </combo-configs>
+
+    <plugins>
+        <plugin name="diagnosis" class="com.neusoft.hit.fe.ext.diagnosis.DiagnosisDataHandler">
+            <property name="diagnosisSelectSql">
+                <![CDATA[
+					SELECT ID,ICD_10,LR AS NAME FROM ZDINFO
+					WHERE BRID = ${patientCode} AND LX = ${diagnosisType}
+					<#if treeId??>
+					    AND SSTREEID = '${treeId}'
+				    </#if>
+					ORDER BY DIAGNOSTIC_ORDER1
+				]]>
+            </property>
+            <property name="diagnosisSelectSql2">
+                <![CDATA[
+					SELECT * FROM ZDINFO
+					WHERE BRID = ${patientCode} AND LX = ${diagnosisType}
+					<#if treeId??>
+					    AND SSTREEID = '${treeId}'
+				    </#if>
+					ORDER BY DIAGNOSTIC_ORDER1
+				]]>
+            </property>
+            <property name="hasDiagnosisSql">
+                <![CDATA[
+                    SELECT
+                        ZD.CREATE_ID AS "createId",
+                        YG.XM AS "createName",
+                        ZC.ID AS "creatorZcId",
+                        ZC.ZC_NAME AS "creatorZcName",
+                        to_char(ZD.CREATE_TIME, 'yyyy-mm-dd') AS "createTime"，
+                        ZD.MODIFY_ID AS "modifyId",
+                        to_char(ZD.MODIFY_TIME, 'yyyy-mm-dd') AS "modifyTime",
+                        YGM.XM AS "modfiyName",
+                        ZCM.ID AS "modifyZcId",
+                        ZCM.ZC_NAME AS "modifyZcName",
+                        ZD.SYNC AS "sync"
+                    FROM
+                        ZDINFO ZD
+                    LEFT JOIN YGJBXX YG ON YG.YGBH = ZD.CREATE_ID
+                    LEFT JOIN ZC_INFO ZC ON ZC.ID = YG.ZC
+                    LEFT JOIN YGJBXX YGM ON YGM.YGBH = ZD.MODIFY_ID
+                    LEFT JOIN ZC_INFO ZCM ON ZCM.ID = YG.ZC
+                    WHERE
+                        ZD.BRID = '${patientCode}'
+                        AND ZD.LX = '${diagnosisType}'
+                        <#if treeId??>
+					        AND SSTREEID = '${treeId}'
+				        </#if>
+                        AND rownum<=1
+				]]>
+            </property>
+            <property name="diagnosisInsertSql">
+                <![CDATA[
+					<#assign now=.now?string("yyyy-MM-dd HH:mm:ss")/>
+					INSERT INTO ZDINFO(ID,BRID,LX,ICD_10,LR,CREATE_ID,CREATE_TIME,MODIFY_ID,MODIFY_TIME
+					<#if treeId??>
+					    ,SSTREEID
+				    </#if>)
+					VALUES('${guid}','${patientCode}','${diagnosisType}','${diagnosisCode}',
+					'${diagnosisText}','${createId}',to_date('${now}','yyyy-mm-dd hh24:mi:ss'),'${staffCode}',
+					to_date('${now}','yyyy-mm-dd hh24:mi:ss')
+					<#if treeId??>
+					    ,'${treeId}'
+				    </#if>)
+				]]>
+            </property>
+            <property name="diagnosisSyncSql">
+                <![CDATA[
+					<#assign now=.now?string("yyyy-MM-dd HH:mm:ss")/>
+					INSERT INTO ZDINFO(ID,BRID,LX,ICD_10,LR,CREATE_ID,CREATE_TIME,MODIFY_ID,MODIFY_TIME,SYNC)
+					VALUES('${guid}','${BRID}','${LX}','${ICD_10}',
+					'${LR}','${staffCode}',to_date('${now}','yyyy-mm-dd hh24:mi:ss'),'${staffCode}',
+					to_date('${now}','yyyy-mm-dd hh24:mi:ss'),'Y')
+				]]>
+            </property>
+
+
+            <property name="diagnosisUpdateAllSql">
+                <![CDATA[
+					<#assign now=.now?string("yyyy-MM-dd HH:mm:ss")/>
+					UPDATE  ZDINFO SET MODIFY_ID = '${staffCode}',MODIFY_TIME = to_date('${now}','yyyy-mm-dd hh24:mi:ss') WHERE BRID = '${patientCode}' AND LX = '${diagnosisType}'
+				]]>
+            </property>
+            <property name="changeSyncStatusSql">
+                <![CDATA[
+					<#assign now=.now?string("yyyy-MM-dd HH:mm:ss")/>
+					UPDATE  ZDINFO SET SYNC='${syncStatus}' WHERE BRID = '${patientCode}' AND LX = '10' OR LX = '20'
+				]]>
+            </property>
+            <property name="subDiagnosisSelectSql">
+                <![CDATA[
+					SELECT SUB_ID AS ID,ZD_ID AS DIAGNOSIS_ID,ZD_NR NAME,ICD10_CODE ICD_10 FROM SUB_ZD_INFO
+					WHERE ZD_ID = '${ID}' ORDER BY DIAGNOSTIC_ORDER1
+				]]>
+            </property>
+            <property name="subDiagnosisSelectSql2">
+                <![CDATA[
+					SELECT * FROM SUB_ZD_INFO
+					WHERE ZD_ID = '${ID}' ORDER BY DIAGNOSTIC_ORDER1
+				]]>
+            </property>
+            <property name="subDiagnosisInsertSql">
+                <![CDATA[
+				 	<#assign now=.now?string("yyyy-MM-dd HH:mm:ss")/>
+					INSERT INTO SUB_ZD_INFO(SUB_ID,ZD_ID,ICD10_CODE,ZD_NR,CREATE_ID,CREATE_TIME,MODIFY_ID,MODIFY_TIME)
+					VALUES('${guid}','${diagnosisParent}','${diagnosisCode}','${diagnosisText}',
+					'${createId}',to_date('${now}','yyyy-mm-dd hh24:mi:ss'),'${staffCode}',
+					to_date('${now}','yyyy-mm-dd hh24:mi:ss'))
+				]]>
+            </property>
+            <property name="subDiagnosisSyncSql">
+                <![CDATA[
+				 	<#assign now=.now?string("yyyy-MM-dd HH:mm:ss")/>
+					INSERT INTO SUB_ZD_INFO(SUB_ID,ZD_ID,ICD10_CODE,ZD_NR,CREATE_ID,CREATE_TIME,MODIFY_ID,MODIFY_TIME)
+					VALUES('${guid}','${diagnosisParent}','${ICD10_CODE}','${ZD_NR}',
+					'${staffCode}',to_date('${now}','yyyy-mm-dd hh24:mi:ss'),'${staffCode}',
+					to_date('${now}','yyyy-mm-dd hh24:mi:ss'))
+				]]>
+            </property>
+            <property name="diagnosisOrderSql">
+                <![CDATA[
+					UPDATE ZDINFO SET DIAGNOSTIC_ORDER1 = ${seq} WHERE ID = '${id}'
+				]]>
+            </property>
+            <property name="subDiagnosisOrderSql">
+                <![CDATA[
+					UPDATE SUB_ZD_INFO SET DIAGNOSTIC_ORDER1 = ${seq} WHERE SUB_ID = '${id}'
+				]]>
+            </property>
+            <property name="diagnosisDeleteSql">
+                <![CDATA[
+					DELETE FROM ZDINFO WHERE ID = '${id}'
+				]]>
+            </property>
+            <property name="dropRYdiagnosisSql">
+                <![CDATA[
+					DELETE FROM ZDINFO WHERE BRID = ${patientCode} AND LX = '20'
+				]]>
+            </property>
+            <property name="dropSubRYdiagnosisSql">
+                <![CDATA[
+					DELETE FROM SUB_ZD_INFO WHERE ZD_ID = '${ID}'
+				]]>
+            </property>
+            <property name="subDiagnosisDeleteSql">
+                <![CDATA[
+					DELETE FROM SUB_ZD_INFO WHERE SUB_ID = '${id}' OR ZD_ID = '${id}'
+				]]>
+            </property>
+            <property name="modelSelectSql">
+                <![CDATA[
+					SELECT ID as "id",LR as "lr",ICD_10 as "icd_10",PID as "pid" FROM ZD_MODEL WHERE CREATE_ID = '${staffCode}' ORDER BY ZD_ORDER
+				]]>
+            </property>
+            <property name="diagnosisSelectSqlAll">
+                <![CDATA[
+					SELECT ID,ICD_10,LR AS NAME FROM ZDINFO
+					WHERE BRID = ${patientCode} ORDER BY DIAGNOSTIC_ORDER1
+				]]>
+            </property>
+            <property name="modelSaveSql">
+                <![CDATA[
+                <#assign now=.now?string("yyyy-MM-dd HH:mm:ss")/>
+					INSERT INTO ZD_MODEL (ID,LR,ICD_10,PID,CREATE_ID,CREATE_TIME,MODIFY_ID,MODIFY_TIME)VALUES
+	                ('${guid}','${diagnosisText}','${diagnosisCode}','${diagnosisParent!}','${staffCode}',TO_DATE ('${now}','yyyy-mm-dd hh24:mi:ss'),
+		            '${staffCode}',TO_DATE ('${now}','yyyy-mm-dd hh24:mi:ss'))
+				]]>
+            </property>
+            <property name="modelDeleteSql">
+                <![CDATA[
+					DELETE FROM ZD_MODEL WHERE ID = '${guid}'
+				]]>
+            </property>
+            <property name="modelSortSql">
+                <![CDATA[
+					UPDATE ZD_MODEL SET ZD_ORDER = ${seq} WHERE ID = '${id}'
+				]]>
+            </property>
+        </plugin>
+        
+        <plugin name="nursing" class="com.neusoft.hit.fe.ext.nursing.NursingDataHandler"/>
+	    <plugin name="surgery" class="com.neusoft.hit.fe.ext.surgery.SurgeryDataHandler"/>
+	    <plugin name="audit" class="com.neusoft.hit.fe.ext.audit.AuditDataHandler"/>
+        <plugin name="pagnation" class="com.neusoft.hit.fe.ext.pagnation.PagnationFormHandler"/>
+    </plugins>
+    
+    <utilities>
+    	<utility name="EmrUtil" class="com.neusoft.hit.fe.ext.utility.EmrUtil"/>
+    </utilities>
+</form-engine>

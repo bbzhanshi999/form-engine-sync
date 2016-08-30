@@ -1,0 +1,17 @@
+.widget-plugin-nursing {
+	vertical-align:center;
+	display:block !important;
+	background:red;
+	height:24px;
+	overflow:hidden;
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	-khtml-user-select: none;
+	user-select: none;
+}
+
+.widget-plugin-nursing.drop-zone {
+	border-left:2px solid red;
+}
+

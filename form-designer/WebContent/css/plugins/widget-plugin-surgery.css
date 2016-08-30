@@ -1,0 +1,15 @@
+.widget-plugin-surgery {
+	background:blue;
+	min-height:24px;
+	overflow:hidden;
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	-khtml-user-select: none;
+	user-select: none;
+}
+
+.widget-plugin-surgery.drop-zone {
+	border-left:2px solid red;
+}
+
